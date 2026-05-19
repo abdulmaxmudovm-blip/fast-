@@ -1,0 +1,6 @@
+{
+  "name": "Fast Write",
+  "description": "A professional typing speed test and keyboard learning application with extensive customization options, including custom fonts, colors, and backgrounds.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
