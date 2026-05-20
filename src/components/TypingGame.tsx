@@ -17,6 +17,7 @@ export const TypingGame: React.FC<TypingGameProps> = ({ settings, setSettings, i
   const [words, setWords] = useState<string[]>([]);
   const [userInput, setUserInput] = useState('');
   const [activeWordIndex, setActiveWordIndex] = useState(0);
+  const [typedHistory, setTypedHistory] = useState<string[]>([]);
   const [gameState, setGameState] = useState<GameState>({
     isStarted: false,
     isFinished: false,
@@ -36,12 +37,18 @@ export const TypingGame: React.FC<TypingGameProps> = ({ settings, setSettings, i
 
   useEffect(() => {
     if (wordsContainerRef.current) {
-      const activeWordEl = wordsContainerRef.current.children[activeWordIndex] as HTMLElement;
+      const children = Array.from(wordsContainerRef.current.children) as HTMLElement[];
+      const activeWordEl = children[activeWordIndex];
       if (activeWordEl) {
-        const wordTop = activeWordEl.offsetTop;
-        // Shift if the word is not on the first row (offset > 24 roughly)
-        if (wordTop > 40) {
-          setMarginOffset(-(wordTop - 40));
+        // Collect all unique offsets of the lines
+        const uniqueOffsets = Array.from(new Set(children.map(c => c.offsetTop))).sort((a, b) => a - b);
+        const activeOffset = activeWordEl.offsetTop;
+        const activeLineIndex = uniqueOffsets.indexOf(activeOffset);
+        
+        // Scroll so the active line occupies the second visible line position
+        if (activeLineIndex >= 2) {
+          const scrollTargetY = uniqueOffsets[activeLineIndex - 1];
+          setMarginOffset(-scrollTargetY);
         } else {
           setMarginOffset(0);
         }
@@ -100,19 +107,25 @@ export const TypingGame: React.FC<TypingGameProps> = ({ settings, setSettings, i
     
     // If space is pressed
     if (value.endsWith(' ')) {
-      const typedWord = value.trim();
-      if (typedWord === currentWord) {
-        setGameState(prev => ({
-          ...prev,
-          correctChars: prev.correctChars + currentWord.length + 1,
-          totalChars: prev.totalChars + currentWord.length + 1
-        }));
-      } else {
-        setGameState(prev => ({
-          ...prev,
-          totalChars: prev.totalChars + currentWord.length + 1
-        }));
+      const typedWord = value.slice(0, -1);
+      setTypedHistory(prev => [...prev, typedWord]);
+
+      let correct = 0;
+      for (let i = 0; i < currentWord.length; i++) {
+        if (i < typedWord.length && typedWord[i] === currentWord[i]) {
+          correct++;
+        }
       }
+      
+      const isWordFullyCorrect = typedWord === currentWord;
+      const spaceCorrect = isWordFullyCorrect ? 1 : 0;
+
+      setGameState(prev => ({
+        ...prev,
+        correctChars: prev.correctChars + correct + spaceCorrect,
+        totalChars: prev.totalChars + Math.max(currentWord.length, typedWord.length) + 1
+      }));
+
       setActiveWordIndex(prev => prev + 1);
       setUserInput('');
 
@@ -143,15 +156,17 @@ export const TypingGame: React.FC<TypingGameProps> = ({ settings, setSettings, i
     setActiveKey('');
   };
 
-  const resetGame = () => {
+  const resetGame = (newDuration?: number, autoStart: boolean = false) => {
     if (timerRef.current) clearInterval(timerRef.current);
     generateWords(settings.language);
     setUserInput('');
     setActiveWordIndex(0);
+    setTypedHistory([]);
+    const targetDuration = newDuration !== undefined ? newDuration : settings.duration;
     setGameState({
-      isStarted: false,
+      isStarted: autoStart,
       isFinished: false,
-      timeLeft: settings.duration,
+      timeLeft: targetDuration,
       wpm: 0,
       accuracy: 0,
       correctChars: 0,
@@ -240,7 +255,7 @@ export const TypingGame: React.FC<TypingGameProps> = ({ settings, setSettings, i
                 key={d} 
                 onClick={() => {
                   setSettings({ ...settings, duration: d });
-                  resetGame();
+                  resetGame(d, false);
                 }}
                 className={cn(
                   "px-1.5 transition-all font-black tracking-tighter hover:scale-110", 
@@ -293,7 +308,7 @@ export const TypingGame: React.FC<TypingGameProps> = ({ settings, setSettings, i
                   autoFocus
                 />
                 
-                <div className="relative h-[140px] overflow-hidden w-full">
+                <div className="relative h-[160px] overflow-hidden w-full">
                   <div 
                     ref={wordsContainerRef}
                     className="flex flex-wrap gap-x-6 gap-y-6 text-3xl leading-tight select-none font-medium text-center justify-center transition-all duration-300"
@@ -305,16 +320,25 @@ export const TypingGame: React.FC<TypingGameProps> = ({ settings, setSettings, i
                       const isActive = wIdx === activeWordIndex;
                       const isTyped = wIdx < activeWordIndex;
                       
-                      // Show only relevant words to keep 3 rows feeling
-                      // Calculating row visibility
                       return (
-                        <span key={wIdx} className={cn("relative transition-all duration-300 flex items-center h-10", isActive ? "text-white scale-105 drop-shadow-md" : "text-white/20")}>
+                        <span 
+                          key={wIdx} 
+                          className={cn(
+                            "relative transition-colors duration-200 flex items-center h-10", 
+                            isActive ? "text-white drop-shadow-md" : isTyped ? "text-white/60" : "text-white/20"
+                          )}
+                        >
                           {word.split('').map((char, cIdx) => {
                             let charColor = "";
                             if (isActive && cIdx < userInput.length) {
                               charColor = userInput[cIdx] === char ? "text-theme-color" : "text-red-500 underline underline-offset-4 decoration-2";
                             } else if (isTyped) {
-                              charColor = "text-white/80";
+                              const typedWord = typedHistory[wIdx] || "";
+                              if (cIdx < typedWord.length) {
+                                charColor = typedWord[cIdx] === char ? "text-white/80" : "text-red-500 underline underline-offset-4 decoration-2";
+                              } else {
+                                charColor = "text-red-500/50 underline underline-offset-4 decoration-2";
+                              }
                             }
 
                             return (

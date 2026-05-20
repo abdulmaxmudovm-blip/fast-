@@ -38,12 +38,18 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ settings, onExit
 
   useEffect(() => {
     if (containerRef.current) {
-      const activeEl = containerRef.current.children[currentIndex] as HTMLElement;
+      const children = Array.from(containerRef.current.children) as HTMLElement[];
+      const activeEl = children[currentIndex];
       if (activeEl) {
-        const top = activeEl.offsetTop;
-        const rowHeight = level === 'letters' ? 80 : 60; // Approximate height including gap
-        if (top > rowHeight * 2) {
-          setMarginOffset(-(top - rowHeight));
+        // Collect all unique offsets of the lines
+        const uniqueOffsets = Array.from(new Set(children.map(c => c.offsetTop))).sort((a, b) => a - b);
+        const activeOffset = activeEl.offsetTop;
+        const activeLineIndex = uniqueOffsets.indexOf(activeOffset);
+
+        // Scroll so that the active line occupies the second visible line position
+        if (activeLineIndex >= 2) {
+          const scrollTargetY = uniqueOffsets[activeLineIndex - 1];
+          setMarginOffset(-scrollTargetY);
         } else {
           setMarginOffset(0);
         }
@@ -186,9 +192,9 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ settings, onExit
                   key={idx}
                   initial={false}
                   animate={{
-                    scale: isActive ? 1.1 : 1,
+                    scale: 1,
                     opacity: isPassed ? 0.2 : 1,
-                    y: isActive ? 0 : 0
+                    y: 0
                   }}
                   className={cn(
                     "relative flex items-center justify-center rounded-2xl border-2 font-bold transition-all duration-300",
