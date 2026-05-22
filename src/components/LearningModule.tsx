@@ -19,6 +19,8 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ settings, onExit
   const [activeKey, setActiveKey] = useState<string>('');
   const [marginOffset, setMarginOffset] = useState(0);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [dummyInput, setDummyInput] = useState('');
 
   useEffect(() => {
     const generateContent = () => {
@@ -34,6 +36,7 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ settings, onExit
     setCurrentIndex(0);
     setWordProgress('');
     setMarginOffset(0);
+    setDummyInput('');
   }, [settings.language, level]);
 
   useEffect(() => {
@@ -58,30 +61,29 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ settings, onExit
   }, [currentIndex, items, level]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      setActiveKey(e.key);
+    // Keep high focus reliability
+    inputRef.current?.focus();
+  }, [currentIndex, level]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (currentIndex >= items.length) {
+      setDummyInput('');
+      return;
+    }
+
+    if (val.length > 0) {
+      const char = val[val.length - 1];
+      setActiveKey(char);
       const target = items[currentIndex];
-      
-      if (e.key === 'Escape') {
-        onExit();
-        return;
-      }
-
-      if (e.key === 'Enter' && currentIndex === items.length) {
-        reset();
-        return;
-      }
-
-      if (currentIndex >= items.length) return;
 
       if (level === 'letters') {
-        if (e.key.toLowerCase() === target.toLowerCase()) {
+        if (char.toLowerCase() === target.toLowerCase()) {
           setCurrentIndex(prev => prev + 1);
         }
       } else {
-        // Word handling
         const currentCharNeeded = target[wordProgress.length];
-        if (e.key.toLowerCase() === currentCharNeeded.toLowerCase()) {
+        if (char.toLowerCase() === currentCharNeeded.toLowerCase()) {
           const newProgress = wordProgress + currentCharNeeded;
           if (newProgress.length === target.length) {
             setWordProgress('');
@@ -89,25 +91,40 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ settings, onExit
           } else {
             setWordProgress(newProgress);
           }
-        } else if (e.key === 'Backspace') {
-          setWordProgress(prev => prev.slice(0, -1));
         }
       }
-    };
+      setDummyInput('');
+    }
+  };
 
-    const handleKeyUp = () => setActiveKey('');
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    setActiveKey(e.key);
+    
+    if (e.key === 'Escape') {
+      onExit();
+      return;
+    }
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [items, currentIndex, level, wordProgress]);
+    if (e.key === 'Enter' && currentIndex === items.length) {
+      reset();
+      return;
+    }
+
+    if (currentIndex >= items.length) return;
+
+    if (level === 'words' && e.key === 'Backspace') {
+      setWordProgress(prev => prev.slice(0, -1));
+    }
+  };
+
+  const handleKeyUp = () => {
+    setActiveKey('');
+  };
 
   const reset = () => {
     setCurrentIndex(0);
     setWordProgress('');
+    setDummyInput('');
     const generateContent = () => {
       if (level === 'letters') {
         const chars = ALPHABETS[settings.language] || ALPHABETS.en;
@@ -118,6 +135,9 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ settings, onExit
       }
     };
     setItems(generateContent());
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
   };
 
   return (
@@ -172,7 +192,20 @@ export const LearningModule: React.FC<LearningModuleProps> = ({ settings, onExit
           <div className="w-24" />
         </div>
 
-        <div className="w-full p-12 joyful-card mb-8 flex flex-col items-center min-h-[350px] justify-center overflow-hidden">
+        <div 
+          onClick={() => inputRef.current?.focus()}
+          className="w-full p-12 joyful-card mb-8 flex flex-col items-center min-h-[350px] justify-center overflow-hidden cursor-pointer relative"
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            className="absolute opacity-0 pointer-events-none w-1 h-1"
+            value={dummyInput}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleKeyUp}
+            autoFocus
+          />
           <div className="text-white/60 uppercase text-xs font-black tracking-[0.3em] mb-12 drop-shadow-sm">
             Target: {level === 'letters' ? 'Character' : 'Word'}
           </div>

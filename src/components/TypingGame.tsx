@@ -296,7 +296,10 @@ export const TypingGame: React.FC<TypingGameProps> = ({ settings, setSettings, i
                 </div>
               </div>
 
-              <div className="relative w-full p-12 joyful-card mb-12">
+              <div 
+                onClick={() => inputRef.current?.focus()}
+                className="relative w-full p-12 joyful-card mb-12 cursor-pointer transition-all active:scale-[0.99]"
+              >
                 <input
                   ref={inputRef}
                   type="text"
